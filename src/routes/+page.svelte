@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { clinicStore, type Appointment, type Patient } from '$lib/store.svelte.ts';
+	import { clinicStore, type Appointment, type Patient } from '$lib/store.svelte';
 	import { 
 		Activity, 
 		Calendar, 
