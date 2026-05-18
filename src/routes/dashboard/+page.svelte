@@ -61,6 +61,10 @@
 	let showInvoiceModal = $state(false);
 	let selectedInvoice = $state<Invoice | null>(null);
 
+	// Appointment Detail Modal
+	let showAptDetailModal = $state(false);
+	let selectedAptDetail = $state<Appointment | null>(null);
+
 	// Patient Modal form fields
 	let patName = $state('');
 	let patNik = $state('');
@@ -366,6 +370,11 @@
 	}
 
 	// Advanced Combined Complete & Diagnose Appointment Workflow
+	function openAptDetail(apt: Appointment) {
+		selectedAptDetail = apt;
+		showAptDetailModal = true;
+	}
+
 	function openDiagnoseModal(apt: Appointment) {
 		activeDiagnoseApt = apt;
 		diagnosisText = '';
@@ -530,7 +539,7 @@
 			>
 				<Calendar size={18} />
 				<span>Janji Temu</span>
-				{#if pendingAptsCount > 0 && clinicStore.currentUser.role !== 'DOCTOR' && clinicStore.currentUser.role !== 'CASHIER'}
+				{#if pendingAptsCount > 0 && (clinicStore.currentUser.role as string) !== 'DOCTOR' && (clinicStore.currentUser.role as string) !== 'CASHIER'}
 					<span class="nav-badge bg-warning text-white">{pendingAptsCount}</span>
 				{/if}
 			</button>
@@ -931,75 +940,34 @@
 
 					<div class="doctor-boards-container">
 						{#if clinicStore.currentUser.role === 'DOCTOR'}
-							<div class="card-premium table-card mb-4">
-								<div class="table-responsive">
-									<table class="dashboard-table">
-										<thead>
-											<tr>
-												<th style="width: 90px; text-align: center;">No. Antrean</th>
-												<th>Kode</th>
-												<th>Nama Pasien</th>
-												<th>No. Telp</th>
-												<th>Tanggal</th>
-												<th>Waktu</th>
-												<th>Gejala/Keluhan</th>
-												<th>Status</th>
-												<th>Aksi Tindakan</th>
-											</tr>
-										</thead>
-										<tbody>
-											{#if filteredAppointments.length === 0}
-												<tr>
-													<td colspan="9" class="text-center py-4">Tidak ada janji temu untuk Anda hari ini.</td>
-												</tr>
-											{:else}
-												{#each filteredAppointments as apt}
-													<tr>
-														<td class="font-bold text-teal" style="font-size: 1.25rem; letter-spacing: 0.5px; text-align: center; background-color: hsl(var(--muted) / 0.2); border-right: 1px solid hsl(var(--border) / 0.5);">{apt.queueNumber || '-'}</td>
-														<td class="font-mono text-primary font-bold">{apt.id}</td>
-														<td><span class="font-bold">{apt.patientName}</span></td>
-														<td>{apt.patientPhone}</td>
-														<td>{apt.date}</td>
-														<td><span class="font-bold">{apt.timeSlot}</span></td>
-														<td class="symptoms-td" title={apt.symptoms}>{apt.symptoms}</td>
-														<td>
-															<span class="status-pill status-{apt.status.toLowerCase()}">
-																{apt.status}
-															</span>
-														</td>
-														<td>
-															<div class="appointment-actions-cell">
-																{#if apt.status === 'Confirmed' && (clinicStore.currentUser.role === 'ADMIN' || clinicStore.currentUser.role === 'RECEPTIONIST')}
-																	<button
-																		class="btn btn-primary btn-sm py-1 px-2"
-																		onclick={() => {
-																			clinicStore.updateAppointmentStatus(apt.id, 'Calling');
-																			alert(`MEMANGGIL ANTREAN: ${apt.queueNumber}\nPasien: ${apt.patientName}\nSilahkan menuju ruang ${apt.doctorName}`);
-																		}}
-																	>
-																		<Volume2 size={12} /> Panggil
-																	</button>
-																{/if}
-
-																{#if (apt.status === 'Confirmed' || apt.status === 'Calling') && (clinicStore.currentUser.role as string) === 'DOCTOR'}
-																	<button
-																		class="btn btn-primary btn-sm py-1 px-2"
-																		onclick={() => openDiagnoseModal(apt)}
-																	>
-																		<Stethoscope size={12} /> Periksa
-																	</button>
-																{/if}
-																{#if apt.status === 'Completed' || apt.status === 'Cancelled'}
-																	<span class="text-muted text-xs">Selesai/Tutup</span>
-																{/if}
-															</div>
-														</td>
-													</tr>
-												{/each}
-											{/if}
-										</tbody>
-									</table>
-								</div>
+							<div class="appointment-grid">
+								{#if filteredAppointments.length === 0}
+									<div class="card-premium table-card text-center py-4" style="grid-column: 1/-1; padding: 3rem;">
+										<span style="font-size: 2.5rem; display: block; margin-bottom: 1rem;">📭</span>
+										<h3 style="margin: 0; color: hsl(var(--foreground));">Tidak ada janji temu untuk Anda.</h3>
+									</div>
+								{:else}
+									{#each filteredAppointments as apt}
+										<button
+											type="button"
+											class="apt-token-card card-premium status-{apt.status.toLowerCase()}"
+											onclick={() => openAptDetail(apt)}
+										>
+											<div class="apt-token-icon">
+												<Users size={32} />
+												<span class="apt-token-q">{apt.queueNumber || '-'}</span>
+											</div>
+											<div class="apt-token-info">
+												<h4>{apt.patientName}</h4>
+												<p>{apt.timeSlot}</p>
+											</div>
+											<div class="apt-token-status">
+												<span class="status-dot-small bg-{apt.status.toLowerCase()}"></span>
+												<span>{apt.status}</span>
+											</div>
+										</button>
+									{/each}
+								{/if}
 							</div>
 						{:else if appointmentsByDoctor.length === 0}
 							<div class="card-premium table-card text-center py-4" style="padding: 3rem;">
@@ -1009,103 +977,35 @@
 							</div>
 						{:else}
 							{#each appointmentsByDoctor as doctorGroup}
-								<div class="doctor-board card-premium mb-4" style="margin-bottom: 2rem; border-top: 4px solid hsl(var(--primary)); border-radius: var(--radius-lg); overflow: hidden;">
-									<div class="doctor-board-header" style="background-color: hsl(var(--muted) / 0.3); padding: 1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid hsl(var(--border));">
-										<div style="display: flex; align-items: center; gap: 1rem;">
-											<div style="background-color: hsl(var(--primary) / 0.1); color: hsl(var(--primary)); padding: 0.6rem; border-radius: 50%;">
-												<Stethoscope size={24} />
-											</div>
-											<div>
-												<h3 style="margin: 0; font-weight: 800; font-size: 1.15rem; color: hsl(var(--foreground));">{doctorGroup.doctorName}</h3>
-												<p style="margin: 0; font-size: 0.8rem; font-weight: 600; color: hsl(var(--muted-foreground));">
-													Total Antrean Saat Ini: <span class="font-bold text-teal">{doctorGroup.apts.length} Pasien</span>
-												</p>
-											</div>
+								<div class="doctor-board-grid-wrap mb-4" style="margin-bottom: 2rem;">
+									<div class="doctor-board-header-grid" style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; padding: 0 0.5rem;">
+										<div style="background-color: hsl(var(--primary) / 0.1); color: hsl(var(--primary)); padding: 0.4rem; border-radius: 50%;">
+											<Stethoscope size={18} />
 										</div>
+										<h3 style="margin: 0; font-weight: 800; font-size: 1rem; color: hsl(var(--foreground));">{doctorGroup.doctorName} <span style="font-weight: 600; color: hsl(var(--muted-foreground)); font-size: 0.8rem;">({doctorGroup.apts.length} Antrean)</span></h3>
 									</div>
-									<div class="table-responsive">
-										<table class="dashboard-table">
-											<thead>
-												<tr>
-													<th style="width: 90px; text-align: center;">No. Antrean</th>
-													<th>Kode</th>
-													<th>Nama Pasien</th>
-													<th>No. Telp</th>
-													<th>Tanggal</th>
-													<th>Waktu</th>
-													<th>Gejala/Keluhan</th>
-													<th>Status</th>
-													<th>Aksi Tindakan</th>
-												</tr>
-											</thead>
-											<tbody>
-												{#each doctorGroup.apts as apt}
-													<tr>
-														<td class="font-bold text-teal" style="font-size: 1.25rem; letter-spacing: 0.5px; text-align: center; background-color: hsl(var(--muted) / 0.2); border-right: 1px solid hsl(var(--border) / 0.5);">{apt.queueNumber || '-'}</td>
-														<td class="font-mono text-primary font-bold">{apt.id}</td>
-														<td><span class="font-bold">{apt.patientName}</span></td>
-														<td>{apt.patientPhone}</td>
-														<td>{apt.date}</td>
-														<td><span class="font-bold">{apt.timeSlot}</span></td>
-														<td class="symptoms-td" title={apt.symptoms}>{apt.symptoms}</td>
-														<td>
-															<span class="status-pill status-{apt.status.toLowerCase()}">
-																{apt.status}
-															</span>
-														</td>
-														<td>
-															<div class="appointment-actions-cell">
-																{#if apt.status === 'Pending' && (clinicStore.currentUser.role === 'ADMIN' || clinicStore.currentUser.role === 'RECEPTIONIST')}
-																	<button 
-																		class="btn btn-outline btn-sm py-1 px-2"
-																		onclick={() => clinicStore.updateAppointmentStatus(apt.id, 'Confirmed')}
-																	>
-																		<Check size={12} /> Setujui
-																	</button>
-																{/if}
-																
-																{#if apt.status === 'Confirmed' && (clinicStore.currentUser.role === 'ADMIN' || clinicStore.currentUser.role === 'RECEPTIONIST')}
-																	<button
-																		class="btn btn-primary btn-sm py-1 px-2"
-																		onclick={() => {
-																			clinicStore.updateAppointmentStatus(apt.id, 'Calling');
-																			alert(`MEMANGGIL ANTREAN: ${apt.queueNumber}\nPasien: ${apt.patientName}\nSilahkan menuju ruang ${apt.doctorName}`);
-																		}}
-																	>
-																		<Volume2 size={12} /> Panggil
-																	</button>
-																{/if}
 
-																{#if (apt.status === 'Confirmed' || apt.status === 'Calling') && (clinicStore.currentUser.role as string) === 'DOCTOR'}
-																	<button 
-																		class="btn btn-primary btn-sm py-1 px-2"
-																		onclick={() => openDiagnoseModal(apt)}
-																	>
-																		<Stethoscope size={12} /> Periksa
-																	</button>
-																{/if}
-
-																{#if apt.status === 'Pending' || apt.status === 'Confirmed' || apt.status === 'Calling'}
-																	<button 
-																		class="btn-text-danger text-danger btn-sm"
-																		onclick={() => {
-																			if(confirm(`Batalkan janji temu ${apt.id}?`)) {
-																				clinicStore.updateAppointmentStatus(apt.id, 'Cancelled');
-																			}
-																		}}
-																	>
-																		Batalkan
-																	</button>
-																{/if}
-																{#if apt.status === 'Completed' || apt.status === 'Cancelled'}
-																	<span class="text-muted text-xs">Selesai/Tutup</span>
-																{/if}
-															</div>
-														</td>
-													</tr>
-												{/each}
-											</tbody>
-										</table>
+									<div class="appointment-grid">
+										{#each doctorGroup.apts as apt}
+											<button
+												type="button"
+												class="apt-token-card card-premium status-{apt.status.toLowerCase()}"
+												onclick={() => openAptDetail(apt)}
+											>
+												<div class="apt-token-icon">
+													<Users size={32} />
+													<span class="apt-token-q">{apt.queueNumber || '-'}</span>
+												</div>
+												<div class="apt-token-info">
+													<h4>{apt.patientName}</h4>
+													<p>{apt.timeSlot}</p>
+												</div>
+												<div class="apt-token-status">
+													<span class="status-dot-small bg-{apt.status.toLowerCase()}"></span>
+													<span>{apt.status}</span>
+												</div>
+											</button>
+										{/each}
 									</div>
 								</div>
 							{/each}
@@ -1298,6 +1198,112 @@
 		</div>
 	</main>
 </div>
+
+<!-- MODAL: APPOINTMENT DETAIL -->
+{#if showAptDetailModal && selectedAptDetail}
+	<div class="modal-backdrop" onclick={() => { showAptDetailModal = false; selectedAptDetail = null; }}>
+		<div class="modal-content animate-scale-up" onclick={(e) => e.stopPropagation()}>
+			<div class="modal-header">
+				<h3>Rincian Janji Temu</h3>
+				<button class="close-modal-btn" onclick={() => { showAptDetailModal = false; selectedAptDetail = null; }}>&times;</button>
+			</div>
+			<div class="modal-body">
+				<div class="apt-detail-view">
+					<div class="apt-detail-header">
+						<div class="apt-detail-q-large">{selectedAptDetail.queueNumber || '-'}</div>
+						<div class="apt-detail-main">
+							<h4>{selectedAptDetail.patientName}</h4>
+							<p class="text-primary font-mono font-bold">{selectedAptDetail.id}</p>
+						</div>
+						<span class="status-pill status-{selectedAptDetail.status.toLowerCase()}">{selectedAptDetail.status}</span>
+					</div>
+
+					<div class="apt-detail-grid mt-4">
+						<div class="detail-item">
+							<label>ID Pasien</label>
+							<p>{selectedAptDetail.patientId}</p>
+						</div>
+						<div class="detail-item">
+							<label>Nomor Telepon</label>
+							<p>{selectedAptDetail.patientPhone}</p>
+						</div>
+						<div class="detail-item">
+							<label>Dokter Tujuan</label>
+							<p>{selectedAptDetail.doctorName}</p>
+						</div>
+						<div class="detail-item">
+							<label>Jadwal Kunjungan</label>
+							<p>{selectedAptDetail.date} • {selectedAptDetail.timeSlot}</p>
+						</div>
+					</div>
+
+					<div class="detail-item full-width mt-3">
+						<label>Keluhan / Gejala</label>
+						<p class="symptoms-text">"{selectedAptDetail.symptoms}"</p>
+					</div>
+				</div>
+			</div>
+			<div class="modal-footer">
+				<div class="footer-actions-left">
+					{#if selectedAptDetail.status === 'Pending' || selectedAptDetail.status === 'Confirmed' || selectedAptDetail.status === 'Calling'}
+						<button
+							class="btn-text-danger text-danger"
+							onclick={() => {
+								if(confirm(`Batalkan janji temu ${selectedAptDetail?.id}?`)) {
+									clinicStore.updateAppointmentStatus(selectedAptDetail!.id, 'Cancelled');
+									showAptDetailModal = false;
+								}
+							}}
+						>
+							Batalkan Janji Temu
+						</button>
+					{/if}
+				</div>
+				<div class="footer-actions-right">
+					{#if selectedAptDetail.status === 'Pending' && (clinicStore.currentUser.role === 'ADMIN' || clinicStore.currentUser.role === 'RECEPTIONIST')}
+						<button
+							class="btn btn-outline"
+							onclick={() => {
+								clinicStore.updateAppointmentStatus(selectedAptDetail!.id, 'Confirmed');
+								showAptDetailModal = false;
+							}}
+						>
+							<Check size={16} /> Setujui
+						</button>
+					{/if}
+
+					{#if selectedAptDetail.status === 'Confirmed' && (clinicStore.currentUser.role === 'ADMIN' || clinicStore.currentUser.role === 'RECEPTIONIST')}
+						<button
+							class="btn btn-primary"
+							onclick={() => {
+								clinicStore.updateAppointmentStatus(selectedAptDetail!.id, 'Calling');
+								alert(`MEMANGGIL ANTREAN: ${selectedAptDetail?.queueNumber}\nPasien: ${selectedAptDetail?.patientName}\nSilahkan menuju ruang ${selectedAptDetail?.doctorName}`);
+								showAptDetailModal = false;
+							}}
+						>
+							<Volume2 size={16} /> Panggil Sekarang
+						</button>
+					{/if}
+
+					{#if (selectedAptDetail.status === 'Confirmed' || selectedAptDetail.status === 'Calling') && (clinicStore.currentUser.role as string) === 'DOCTOR'}
+						<button
+							class="btn btn-primary"
+							onclick={() => {
+								const apt = selectedAptDetail!;
+								showAptDetailModal = false;
+								openDiagnoseModal(apt);
+							}}
+						>
+							<Stethoscope size={16} /> Periksa Pasien
+						</button>
+					{/if}
+
+					<button class="btn btn-secondary" onclick={() => { showAptDetailModal = false; selectedAptDetail = null; }}>Tutup</button>
+				</div>
+			</div>
+		</div>
+	</div>
+{/if}
 
 <!-- MODAL: ADD/EDIT PATIENT -->
 {#if showPatientModal}
@@ -2249,18 +2255,131 @@
 		color: hsl(var(--primary));
 	}
 
-	/* Appointment actions cell */
-	.appointment-actions-cell {
+	/* Appointment Grid & Token Card */
+	.appointment-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+		gap: 1.25rem;
+	}
+	.apt-token-card {
+		padding: 1.5rem 1rem;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		text-align: center;
+		gap: 0.75rem;
+		cursor: pointer;
+		background: white;
+	}
+	.apt-token-icon {
+		position: relative;
+		width: 70px;
+		height: 70px;
+		background-color: hsl(var(--muted));
+		border-radius: 50%;
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
+		justify-content: center;
+		color: hsl(var(--muted-foreground));
 	}
-	.symptoms-td {
-		max-width: 150px;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
+	.apt-token-q {
+		position: absolute;
+		top: -5px;
+		right: -5px;
+		background-color: hsl(var(--primary));
+		color: white;
+		font-size: 0.65rem;
+		font-weight: 800;
+		padding: 0.2rem 0.5rem;
+		border-radius: 999px;
+		box-shadow: var(--shadow-sm);
 	}
+	.apt-token-info h4 {
+		font-size: 0.9rem;
+		font-weight: 800;
+		margin-bottom: 0.25rem;
+	}
+	.apt-token-info p {
+		font-size: 0.7rem;
+		font-weight: 700;
+		color: hsl(var(--muted-foreground));
+	}
+	.apt-token-status {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+		font-size: 0.65rem;
+		font-weight: 800;
+		text-transform: uppercase;
+		color: hsl(var(--muted-foreground));
+	}
+	.status-dot-small {
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+	}
+	.bg-pending { background-color: hsl(var(--warning)); }
+	.bg-confirmed { background-color: hsl(var(--primary)); }
+	.bg-calling { background-color: hsl(var(--info)); }
+	.bg-completed { background-color: hsl(var(--success)); }
+	.bg-cancelled { background-color: hsl(var(--danger)); }
+
+	/* Appointment Detail Modal Styles */
+	.apt-detail-header {
+		display: flex;
+		align-items: center;
+		gap: 1.25rem;
+		padding-bottom: 1.25rem;
+		border-bottom: 1px solid hsl(var(--border) / 0.8);
+	}
+	.apt-detail-q-large {
+		width: 60px;
+		height: 60px;
+		background-color: hsl(var(--primary-light));
+		color: hsl(var(--primary));
+		font-weight: 900;
+		font-size: 1.25rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: var(--radius-md);
+	}
+	.apt-detail-main { flex: 1; }
+	.apt-detail-main h4 { font-size: 1.25rem; }
+	.apt-detail-grid {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 1.25rem;
+	}
+	.detail-item label {
+		font-size: 0.65rem;
+		font-weight: 800;
+		text-transform: uppercase;
+		color: hsl(var(--muted-foreground));
+		display: block;
+		margin-bottom: 0.25rem;
+	}
+	.detail-item p {
+		font-size: 0.9rem;
+		font-weight: 700;
+	}
+	.full-width { grid-column: 1 / -1; }
+	.symptoms-text {
+		font-style: italic;
+		color: hsl(var(--muted-foreground));
+		background-color: hsl(var(--muted) / 0.3);
+		padding: 0.75rem;
+		border-radius: var(--radius-sm);
+		border-left: 3px solid hsl(var(--border));
+	}
+	.footer-actions-left { flex: 1; text-align: left; }
+	.footer-actions-right { display: flex; gap: 0.75rem; }
+	.btn-text-danger {
+		font-size: 0.85rem;
+		font-weight: 700;
+		padding: 0.5rem 0;
+	}
+	.btn-text-danger:hover { text-decoration: underline; }
 
 	/* Medical Records Dashboard style */
 	.records-dashboard-list {
