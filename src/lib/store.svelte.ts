@@ -32,7 +32,7 @@ export interface Appointment {
 	date: string;
 	timeSlot: string;
 	symptoms: string;
-	status: 'Pending' | 'Confirmed' | 'Completed' | 'Cancelled';
+	status: 'Pending' | 'Confirmed' | 'Calling' | 'Completed' | 'Cancelled';
 	createdAt: string;
 	queueNumber?: string;
 }
@@ -69,7 +69,7 @@ export interface Invoice {
 	status: 'Paid' | 'Unpaid';
 }
 
-export type UserRole = 'ADMIN' | 'DOCTOR' | 'CASHIER';
+export type UserRole = 'ADMIN' | 'DOCTOR' | 'CASHIER' | 'RECEPTIONIST';
 
 export interface User {
 	id: string;
@@ -284,6 +284,7 @@ const defaultInvoices: Invoice[] = [
 
 const defaultUsers: User[] = [
 	{ id: 'admin-01', name: 'Administrator Utama', role: 'ADMIN' },
+	{ id: 'receptionist-01', name: 'Budi Resepsionis', role: 'RECEPTIONIST' },
 	{ id: 'cashier-01', name: 'Siti Kasir', role: 'CASHIER' },
 	{ id: 'doc-001', name: 'dr. Adrian Sp.PD', role: 'DOCTOR', doctorId: 'DOC-001' },
 	{ id: 'doc-002', name: 'dr. Sarah Sp.A', role: 'DOCTOR', doctorId: 'DOC-002' },

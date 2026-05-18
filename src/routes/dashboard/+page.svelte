@@ -23,7 +23,8 @@
 		Filter,
 		Heart,
 		ClipboardList,
-		UserPlus
+		UserPlus,
+		Volume2
 	} from 'lucide-svelte';
 
 	// Svelte 5 reactive state for active tab
@@ -32,7 +33,7 @@
 	// Search & Filters state
 	let patientSearchQuery = $state('');
 	let doctorSearchQuery = $state('');
-	let appointmentStatusFilter = $state('All'); // All, Pending, Confirmed, Completed, Cancelled
+	let appointmentStatusFilter = $state('All'); // All, Pending, Confirmed, Calling, Completed, Cancelled
 	let recordsSearchQuery = $state('');
 	let invoiceStatusFilter = $state('All'); // All, Paid, Unpaid
 
@@ -499,7 +500,7 @@
 				<span>Ringkasan Klinik</span>
 			</button>
 			
-			{#if clinicStore.currentUser.role === 'ADMIN' || clinicStore.currentUser.role === 'CASHIER'}
+			{#if clinicStore.currentUser.role === 'ADMIN' || clinicStore.currentUser.role === 'CASHIER' || clinicStore.currentUser.role === 'RECEPTIONIST'}
 			<button 
 				type="button" 
 				class="nav-item {activeTab === 'patients' ? 'active' : ''}" 
@@ -521,6 +522,7 @@
 			</button>
 			{/if}
 
+			{#if clinicStore.currentUser.role !== 'CASHIER'}
 			<button 
 				type="button" 
 				class="nav-item {activeTab === 'appointments' ? 'active' : ''}" 
@@ -528,11 +530,13 @@
 			>
 				<Calendar size={18} />
 				<span>Janji Temu</span>
-				{#if pendingAptsCount > 0 && clinicStore.currentUser.role !== 'DOCTOR'}
+				{#if pendingAptsCount > 0 && clinicStore.currentUser.role !== 'DOCTOR' && clinicStore.currentUser.role !== 'CASHIER'}
 					<span class="nav-badge bg-warning text-white">{pendingAptsCount}</span>
 				{/if}
 			</button>
+			{/if}
 
+			{#if clinicStore.currentUser.role !== 'RECEPTIONIST' && clinicStore.currentUser.role !== 'CASHIER'}
 			<button 
 				type="button" 
 				class="nav-item {activeTab === 'records' ? 'active' : ''}" 
@@ -541,6 +545,7 @@
 				<ClipboardList size={18} />
 				<span>Rekam Medis</span>
 			</button>
+			{/if}
 
 			{#if clinicStore.currentUser.role === 'ADMIN' || clinicStore.currentUser.role === 'CASHIER'}
 			<button 
@@ -579,7 +584,17 @@
 			</div>
 			
 			<div class="header-user-badge animate-glow" style="position: relative; cursor: pointer;">
-				<span class="user-avatar-small">{clinicStore.currentUser.role === 'DOCTOR' ? '🩺' : clinicStore.currentUser.role === 'CASHIER' ? '💰' : '🔑'}</span>
+				<span class="user-avatar-small">
+					{#if clinicStore.currentUser.role === 'DOCTOR'}
+						🩺
+					{:else if clinicStore.currentUser.role === 'CASHIER'}
+						💰
+					{:else if clinicStore.currentUser.role === 'RECEPTIONIST'}
+						📋
+					{:else}
+						🔑
+					{/if}
+				</span>
 				<div>
 					<h5>{clinicStore.currentUser.name}</h5>
 					<p>{clinicStore.currentUser.role} - Sistem Aktif</p>
@@ -902,7 +917,7 @@
 							<span>Filter Status:</span>
 						</div>
 						<div class="filter-tabs">
-							{#each ['All', 'Pending', 'Confirmed', 'Completed', 'Cancelled'] as status}
+							{#each ['All', 'Pending', 'Confirmed', 'Calling', 'Completed', 'Cancelled'] as status}
 								<button 
 									type="button" 
 									class="filter-tab-btn {appointmentStatusFilter === status ? 'active' : ''}"
@@ -954,7 +969,19 @@
 														</td>
 														<td>
 															<div class="appointment-actions-cell">
-																{#if apt.status === 'Confirmed'}
+																{#if apt.status === 'Confirmed' && (clinicStore.currentUser.role === 'ADMIN' || clinicStore.currentUser.role === 'RECEPTIONIST')}
+																	<button
+																		class="btn btn-primary btn-sm py-1 px-2"
+																		onclick={() => {
+																			clinicStore.updateAppointmentStatus(apt.id, 'Calling');
+																			alert(`MEMANGGIL ANTREAN: ${apt.queueNumber}\nPasien: ${apt.patientName}\nSilahkan menuju ruang ${apt.doctorName}`);
+																		}}
+																	>
+																		<Volume2 size={12} /> Panggil
+																	</button>
+																{/if}
+
+																{#if (apt.status === 'Confirmed' || apt.status === 'Calling') && (clinicStore.currentUser.role as string) === 'DOCTOR'}
 																	<button
 																		class="btn btn-primary btn-sm py-1 px-2"
 																		onclick={() => openDiagnoseModal(apt)}
@@ -1028,7 +1055,7 @@
 														</td>
 														<td>
 															<div class="appointment-actions-cell">
-																{#if apt.status === 'Pending'}
+																{#if apt.status === 'Pending' && (clinicStore.currentUser.role === 'ADMIN' || clinicStore.currentUser.role === 'RECEPTIONIST')}
 																	<button 
 																		class="btn btn-outline btn-sm py-1 px-2"
 																		onclick={() => clinicStore.updateAppointmentStatus(apt.id, 'Confirmed')}
@@ -1037,7 +1064,19 @@
 																	</button>
 																{/if}
 																
-																{#if apt.status === 'Confirmed'}
+																{#if apt.status === 'Confirmed' && (clinicStore.currentUser.role === 'ADMIN' || clinicStore.currentUser.role === 'RECEPTIONIST')}
+																	<button
+																		class="btn btn-primary btn-sm py-1 px-2"
+																		onclick={() => {
+																			clinicStore.updateAppointmentStatus(apt.id, 'Calling');
+																			alert(`MEMANGGIL ANTREAN: ${apt.queueNumber}\nPasien: ${apt.patientName}\nSilahkan menuju ruang ${apt.doctorName}`);
+																		}}
+																	>
+																		<Volume2 size={12} /> Panggil
+																	</button>
+																{/if}
+
+																{#if (apt.status === 'Confirmed' || apt.status === 'Calling') && (clinicStore.currentUser.role as string) === 'DOCTOR'}
 																	<button 
 																		class="btn btn-primary btn-sm py-1 px-2"
 																		onclick={() => openDiagnoseModal(apt)}
@@ -1046,7 +1085,7 @@
 																	</button>
 																{/if}
 
-																{#if apt.status === 'Pending' || apt.status === 'Confirmed'}
+																{#if apt.status === 'Pending' || apt.status === 'Confirmed' || apt.status === 'Calling'}
 																	<button 
 																		class="btn-text-danger text-danger btn-sm"
 																		onclick={() => {
@@ -1997,6 +2036,7 @@
 	}
 	.status-pending { background-color: #fef3c7; color: #d97706; }
 	.status-confirmed { background-color: #ccfbf1; color: #0d9488; }
+	.status-calling { background-color: #e0f2fe; color: #0369a1; animation: pulse 2s infinite; }
 	.status-completed { background-color: #dcfce7; color: #15803d; }
 	.status-cancelled { background-color: #fee2e2; color: #b91c1c; }
 	
