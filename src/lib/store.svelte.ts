@@ -32,7 +32,7 @@ export interface Appointment {
 	date: string;
 	timeSlot: string;
 	symptoms: string;
-	status: 'Pending' | 'Confirmed' | 'Completed' | 'Cancelled';
+	status: 'Pending' | 'Confirmed' | 'Calling' | 'Completed' | 'Cancelled';
 	createdAt: string;
 	queueNumber?: string;
 }
@@ -69,7 +69,7 @@ export interface Invoice {
 	status: 'Paid' | 'Unpaid';
 }
 
-export type UserRole = 'ADMIN' | 'DOCTOR' | 'CASHIER';
+export type UserRole = 'ADMIN' | 'DOCTOR' | 'CASHIER' | 'RECEPTIONIST';
 
 export interface User {
 	id: string;
@@ -284,6 +284,7 @@ const defaultInvoices: Invoice[] = [
 
 const defaultUsers: User[] = [
 	{ id: 'admin-01', name: 'Administrator Utama', role: 'ADMIN' },
+	{ id: 'receptionist-01', name: 'Budi Resepsionis', role: 'RECEPTIONIST' },
 	{ id: 'cashier-01', name: 'Siti Kasir', role: 'CASHIER' },
 	{ id: 'doc-001', name: 'dr. Adrian Sp.PD', role: 'DOCTOR', doctorId: 'DOC-001' },
 	{ id: 'doc-002', name: 'dr. Sarah Sp.A', role: 'DOCTOR', doctorId: 'DOC-002' },
@@ -328,6 +329,9 @@ class ClinicStore {
 
 			const taxRateData = localStorage.getItem('medika_tax_rate');
 			this.taxRate = taxRateData ? JSON.parse(taxRateData) : 10;
+
+			const usersData = localStorage.getItem('medika_users');
+			this.users = usersData ? JSON.parse(usersData) : defaultUsers;
 		} catch (error) {
 			console.error('Failed to load clinic data from localStorage:', error);
 			this.patients = defaultPatients;
@@ -335,6 +339,7 @@ class ClinicStore {
 			this.appointments = defaultAppointments;
 			this.medicalRecords = defaultMedicalRecords;
 			this.invoices = defaultInvoices;
+			this.users = defaultUsers;
 		}
 	}
 
@@ -378,11 +383,11 @@ class ClinicStore {
 
 	// Doctors Actions
 	addDoctor(doctorData: Omit<Doctor, 'id'>): Doctor {
-		const nextIdNum = this.doctors.length > 0 
-			? Math.max(...this.doctors.map(d => parseInt(d.id.split('-')[1]))) + 1 
+		const nextIdNum = this.doctors.length > 0
+			? Math.max(...this.doctors.map((d) => parseInt(d.id.split('-')[1]))) + 1
 			: 1;
 		const id = `DOC-${String(nextIdNum).padStart(3, '0')}`;
-		
+
 		const newDoctor: Doctor = {
 			id,
 			...doctorData
@@ -390,17 +395,38 @@ class ClinicStore {
 
 		this.doctors = [...this.doctors, newDoctor];
 		this.saveData('medika_doctors', this.doctors);
+
+		// Automatically create a user for the new doctor
+		const newUser: User = {
+			id: id.toLowerCase(),
+			name: newDoctor.name,
+			role: 'DOCTOR',
+			doctorId: id
+		};
+		this.users = [...this.users, newUser];
+		this.saveData('medika_users', this.users);
+
 		return newDoctor;
 	}
 
 	updateDoctor(updatedDoctor: Doctor) {
-		this.doctors = this.doctors.map(d => d.id === updatedDoctor.id ? updatedDoctor : d);
+		this.doctors = this.doctors.map((d) => (d.id === updatedDoctor.id ? updatedDoctor : d));
 		this.saveData('medika_doctors', this.doctors);
+
+		// Synchronize user data when doctor profile is updated
+		this.users = this.users.map((u) =>
+			u.doctorId === updatedDoctor.id ? { ...u, name: updatedDoctor.name } : u
+		);
+		this.saveData('medika_users', this.users);
 	}
 
 	deleteDoctor(id: string) {
-		this.doctors = this.doctors.filter(d => d.id !== id);
+		this.doctors = this.doctors.filter((d) => d.id !== id);
 		this.saveData('medika_doctors', this.doctors);
+
+		// Remove the associated user when doctor is deleted
+		this.users = this.users.filter((u) => u.doctorId !== id);
+		this.saveData('medika_users', this.users);
 	}
 
 	// Appointments Actions
