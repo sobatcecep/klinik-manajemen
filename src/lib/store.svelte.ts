@@ -69,6 +69,15 @@ export interface Invoice {
 	status: 'Paid' | 'Unpaid';
 }
 
+export type UserRole = 'ADMIN' | 'DOCTOR' | 'CASHIER';
+
+export interface User {
+	id: string;
+	name: string;
+	role: UserRole;
+	doctorId?: string;
+}
+
 const defaultPatients: Patient[] = [
 	{
 		id: 'PAT-001',
@@ -273,6 +282,16 @@ const defaultInvoices: Invoice[] = [
 	}
 ];
 
+const defaultUsers: User[] = [
+	{ id: 'admin-01', name: 'Administrator Utama', role: 'ADMIN' },
+	{ id: 'cashier-01', name: 'Siti Kasir', role: 'CASHIER' },
+	{ id: 'doc-001', name: 'dr. Adrian Sp.PD', role: 'DOCTOR', doctorId: 'DOC-001' },
+	{ id: 'doc-002', name: 'dr. Sarah Sp.A', role: 'DOCTOR', doctorId: 'DOC-002' },
+	{ id: 'doc-003', name: 'dr. Handoko Sp.JP', role: 'DOCTOR', doctorId: 'DOC-003' },
+	{ id: 'doc-004', name: 'dr. Linda Sp.OG', role: 'DOCTOR', doctorId: 'DOC-004' },
+	{ id: 'doc-005', name: 'drg. Rian Pratama', role: 'DOCTOR', doctorId: 'DOC-005' }
+];
+
 class ClinicStore {
 	patients = $state<Patient[]>([]);
 	doctors = $state<Doctor[]>([]);
@@ -280,6 +299,9 @@ class ClinicStore {
 	medicalRecords = $state<MedicalRecord[]>([]);
 	invoices = $state<Invoice[]>([]);
 	taxRate = $state<number>(10); // Dynamic tax rate in percentage (defaults to 10%)
+
+	users = $state<User[]>(defaultUsers);
+	currentUser = $state<User>(defaultUsers[0]);
 
 	constructor() {
 		this.loadData();
@@ -479,6 +501,14 @@ class ClinicStore {
 	updateTaxRate(rate?: number) {
 		if (rate !== undefined) this.taxRate = rate;
 		this.saveData('medika_tax_rate', this.taxRate);
+	}
+
+	// User Actions
+	switchUser(userId: string) {
+		const user = this.users.find((u) => u.id === userId);
+		if (user) {
+			this.currentUser = user;
+		}
 	}
 }
 

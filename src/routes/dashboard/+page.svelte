@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { clinicStore, type Patient, type Doctor, type Appointment, type MedicalRecord, type Invoice, type InvoiceItem } from '$lib/store.svelte.ts';
+	import { clinicStore, type Patient, type Doctor, type Appointment, type MedicalRecord, type Invoice, type InvoiceItem, type User } from '$lib/store.svelte';
 	import { 
 		Users, 
 		Calendar, 
@@ -122,7 +122,9 @@
 	const filteredAppointments = $derived(
 		clinicStore.appointments.filter(a => {
 			const matchesStatus = appointmentStatusFilter === 'All' || a.status === appointmentStatusFilter;
-			return matchesStatus;
+			// Filter by doctorId if current user is a DOCTOR
+			const matchesDoctor = clinicStore.currentUser.role !== 'DOCTOR' || a.doctorId === clinicStore.currentUser.doctorId;
+			return matchesStatus && matchesDoctor;
 		})
 	);
 
@@ -425,7 +427,13 @@
 		showDiagnoseModal = false;
 		activeDiagnoseApt = null;
 		alert('Pemeriksaan berhasil diselesaikan! Rekam medis dan tagihan baru telah dibuat.');
-		activeTab = 'billing'; // Jump to cashier to see invoice!
+
+		// Role-based redirect
+		if (clinicStore.currentUser.role === 'CASHIER' || clinicStore.currentUser.role === 'ADMIN') {
+			activeTab = 'billing';
+		} else {
+			activeTab = 'records';
+		}
 	}
 
 	function printInvoice() {
@@ -491,6 +499,7 @@
 				<span>Ringkasan Klinik</span>
 			</button>
 			
+			{#if clinicStore.currentUser.role === 'ADMIN' || clinicStore.currentUser.role === 'CASHIER'}
 			<button 
 				type="button" 
 				class="nav-item {activeTab === 'patients' ? 'active' : ''}" 
@@ -499,7 +508,9 @@
 				<Users size={18} />
 				<span>Manajemen Pasien</span>
 			</button>
+			{/if}
 
+			{#if clinicStore.currentUser.role === 'ADMIN'}
 			<button 
 				type="button" 
 				class="nav-item {activeTab === 'doctors' ? 'active' : ''}" 
@@ -508,6 +519,7 @@
 				<Stethoscope size={18} />
 				<span>Manajemen Dokter</span>
 			</button>
+			{/if}
 
 			<button 
 				type="button" 
@@ -516,7 +528,7 @@
 			>
 				<Calendar size={18} />
 				<span>Janji Temu</span>
-				{#if pendingAptsCount > 0}
+				{#if pendingAptsCount > 0 && clinicStore.currentUser.role !== 'DOCTOR'}
 					<span class="nav-badge bg-warning text-white">{pendingAptsCount}</span>
 				{/if}
 			</button>
@@ -530,6 +542,7 @@
 				<span>Rekam Medis</span>
 			</button>
 
+			{#if clinicStore.currentUser.role === 'ADMIN' || clinicStore.currentUser.role === 'CASHIER'}
 			<button 
 				type="button" 
 				class="nav-item {activeTab === 'billing' ? 'active' : ''}" 
@@ -538,6 +551,7 @@
 				<CreditCard size={18} />
 				<span>Kasir & Tagihan</span>
 			</button>
+			{/if}
 		</nav>
 
 		<div class="sidebar-footer">
@@ -564,12 +578,23 @@
 				<p class="page-subtitle">Portal Administrator & Dokter Medika Utama • {new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
 			</div>
 			
-			<div class="header-user-badge animate-glow">
-				<span class="user-avatar-small">🩺</span>
+			<div class="header-user-badge animate-glow" style="position: relative; cursor: pointer;">
+				<span class="user-avatar-small">{clinicStore.currentUser.role === 'DOCTOR' ? '🩺' : clinicStore.currentUser.role === 'CASHIER' ? '💰' : '🔑'}</span>
 				<div>
-					<h5>Administrator</h5>
-					<p>Sistem Klinik Aktif</p>
+					<h5>{clinicStore.currentUser.name}</h5>
+					<p>{clinicStore.currentUser.role} - Sistem Aktif</p>
 				</div>
+				<select
+					class="user-switcher-select"
+					style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;"
+					onchange={(e) => clinicStore.switchUser((e.target as HTMLSelectElement).value)}
+				>
+					{#each clinicStore.users as user}
+						<option value={user.id} selected={user.id === clinicStore.currentUser.id}>
+							{user.name} ({user.role})
+						</option>
+					{/each}
+				</select>
 			</div>
 		</header>
 
@@ -890,7 +915,66 @@
 					</div>
 
 					<div class="doctor-boards-container">
-						{#if appointmentsByDoctor.length === 0}
+						{#if clinicStore.currentUser.role === 'DOCTOR'}
+							<div class="card-premium table-card mb-4">
+								<div class="table-responsive">
+									<table class="dashboard-table">
+										<thead>
+											<tr>
+												<th style="width: 90px; text-align: center;">No. Antrean</th>
+												<th>Kode</th>
+												<th>Nama Pasien</th>
+												<th>No. Telp</th>
+												<th>Tanggal</th>
+												<th>Waktu</th>
+												<th>Gejala/Keluhan</th>
+												<th>Status</th>
+												<th>Aksi Tindakan</th>
+											</tr>
+										</thead>
+										<tbody>
+											{#if filteredAppointments.length === 0}
+												<tr>
+													<td colspan="9" class="text-center py-4">Tidak ada janji temu untuk Anda hari ini.</td>
+												</tr>
+											{:else}
+												{#each filteredAppointments as apt}
+													<tr>
+														<td class="font-bold text-teal" style="font-size: 1.25rem; letter-spacing: 0.5px; text-align: center; background-color: hsl(var(--muted) / 0.2); border-right: 1px solid hsl(var(--border) / 0.5);">{apt.queueNumber || '-'}</td>
+														<td class="font-mono text-primary font-bold">{apt.id}</td>
+														<td><span class="font-bold">{apt.patientName}</span></td>
+														<td>{apt.patientPhone}</td>
+														<td>{apt.date}</td>
+														<td><span class="font-bold">{apt.timeSlot}</span></td>
+														<td class="symptoms-td" title={apt.symptoms}>{apt.symptoms}</td>
+														<td>
+															<span class="status-pill status-{apt.status.toLowerCase()}">
+																{apt.status}
+															</span>
+														</td>
+														<td>
+															<div class="appointment-actions-cell">
+																{#if apt.status === 'Confirmed'}
+																	<button
+																		class="btn btn-primary btn-sm py-1 px-2"
+																		onclick={() => openDiagnoseModal(apt)}
+																	>
+																		<Stethoscope size={12} /> Periksa
+																	</button>
+																{/if}
+																{#if apt.status === 'Completed' || apt.status === 'Cancelled'}
+																	<span class="text-muted text-xs">Selesai/Tutup</span>
+																{/if}
+															</div>
+														</td>
+													</tr>
+												{/each}
+											{/if}
+										</tbody>
+									</table>
+								</div>
+							</div>
+						{:else if appointmentsByDoctor.length === 0}
 							<div class="card-premium table-card text-center py-4" style="padding: 3rem;">
 								<span style="font-size: 2.5rem; display: block; margin-bottom: 1rem;">📭</span>
 								<h3 style="margin: 0; color: hsl(var(--foreground));">Tidak ada janji temu terdaftar.</h3>
